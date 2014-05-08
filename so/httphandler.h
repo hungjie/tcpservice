@@ -25,10 +25,10 @@
 
 class HttpHandler :  public HandlerBase
 {
-public:
-    virtual int handle_output(int sock, const char* buf, size_t len);
-    virtual int handle_input(int sock, char* buf, size_t len);
-    virtual int handle_handshake(int sock, char* buf, size_t len);
+protected:
+    virtual int do_handle_output(int sock, const char* buf, size_t len);
+    virtual int do_handle_input(int sock, char*& buf, size_t len);
+    virtual int do_handle_handshake(int sock, char*& buf, size_t len);
 };
 
 extern"C" HandlerBase * create_httphandler()

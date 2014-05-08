@@ -17,10 +17,34 @@
  *
  */
 
+#include <map>
 #include "handler.h"
-handle_init_t 	   Handler::handle_init = 0;
-handle_handshake_t Handler::handle_handshake = 0;
-handle_input_t 	   Handler::handle_input = 0;
-handle_output_t	   Handler::handle_output = 0;
+#include "iniconfig.h"
 
-HandlerBase* hb = 0;
+HandlerBase* HandlerBase::get(const string name)
+{
+    static map<string, HandlerBase* > handlers;
+    if (handlers.find(name) != handlers.end()) return handlers[name];
+    
+    string filename = "./lib" + name + ".so";
+    void* h = dlopen(filename.c_str(), RTLD_LAZY);
+    if (!h){ perror("dl open failed: "); exit(1); }
+    
+
+    string create_handler_s = "create_" + name;
+    HandlerBase::create_handler_t create_handler = (HandlerBase::create_handler_t)dlsym(h, create_handler_s.c_str());
+    
+    HandlerBase* hb;
+    handlers[name] = hb = create_handler();
+    
+    INIConfig& c = Singleton<INIConfig>::instance();
+
+    string next = c.get_value_s("[" + name + "]", "next");
+    if (next != ""){
+        HandlerBase* next_handler = HandlerBase::get(next);
+        hb->next(next_handler);
+    }
+    
+    return hb; 
+}
+

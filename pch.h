@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <string>
+#include <memory>
 
 #include "singleton.h"
 

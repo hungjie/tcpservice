@@ -19,32 +19,46 @@
 
 #ifndef HANDLER_H
 #define HANDLER_H
-
 #include "pch.h"
-
-extern "C" {
-  typedef int (*handle_init_t)(void*);
-  typedef int (*handle_handshake_t)(int sock, char* buf, size_t len);
-  typedef int (*handle_input_t)(int sock, char* buf, size_t len);
-  typedef int (*handle_output_t)(int sock, const char* buf, size_t len);  
-};
-
-class Handler{
-public:
-  static handle_init_t handle_init;
-  static handle_handshake_t handle_handshake;
-  static handle_input_t handle_input;
-  static handle_output_t handle_output;
-  
-};
 
 class HandlerBase{
 public:
-    virtual int handle_handshake(int sock, char* buf, size_t len) = 0;
-    virtual int handle_input(int sock, char* buf, size_t len) = 0;
-    virtual int handle_output(int sock, const char* buf, size_t len) = 0;
+    typedef HandlerBase* (*create_handler_t)();
+    
+protected:
+    virtual int do_handle_handshake(int sock, char*& buf, size_t len) = 0;
+    virtual int do_handle_input(int sock, char*& buf, size_t len) = 0;
+    virtual int do_handle_output(int sock, const char* buf, size_t len) = 0;
+    
+public:
+    static HandlerBase* get(const string name);
+    void next(HandlerBase* next){_nexthandler = next; }
+    
+    int handle_handshake(int sock, char*& buf, size_t len) {
+        if (len < 1) return len;
+        int r = do_handle_handshake(sock, buf, len);
+        if (_nexthandler)
+            return _nexthandler->handle_handshake(sock, buf, r);
+        return r;
+    }
+    int handle_input(int sock, char*& buf, size_t len) {
+        if (len < 1) return len;
+        int r = do_handle_input(sock, buf, len);
+        if (_nexthandler)
+            return _nexthandler->do_handle_input(sock, buf, r);
+        return r;
+    }
+    
+    int handle_output(int sock, const char* buf, size_t len) {
+        if (len < 1) return len;
+        if (_nexthandler)
+             len = _nexthandler->handle_output(sock, buf, len);
+        return do_handle_output(sock, buf, len);
+    }
+    
+
+    
+private:
+    HandlerBase* _nexthandler;
 };
-
-extern HandlerBase *hb;
-
 #endif // HANDLER_H

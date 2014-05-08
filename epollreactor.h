@@ -21,27 +21,23 @@
 #define EPOLLREACTOR_H
 
 #include "handler.h"
+#include "tcpserver.h"
 
 class EpollReactor
 {
 public:
-    EpollReactor(int sock
-      , handle_handshake_t handshake =  0
-      , handle_input_t input =  0
-      , handle_output_t output = 0);
+    EpollReactor(TCPServer* server, int buffer_size);
     ~EpollReactor();
-    void run(size_t);
+    void run();
 private:
     
     EpollReactor(const EpollReactor& other);
     EpollReactor& operator=(const EpollReactor& other);
     bool operator==(const EpollReactor& other);
     
-    int _sock;
+    TCPServer* _server;
+    int _buffer_size;
     
-    handle_handshake_t _handle_handshake;
-    handle_input_t _handle_input;
-    handle_output_t _handle_output;
 };
 
 #endif // EPOLLREACTOR_H

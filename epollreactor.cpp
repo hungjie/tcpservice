@@ -22,8 +22,7 @@
 #include "tcpsocket.h"
 
 
-EpollReactor::EpollReactor(int sock, handle_handshake_t  handshake, handle_input_t  input, handle_output_t output)
-    :_sock(sock), _handle_handshake(handshake), _handle_input(input), _handle_output(output)
+EpollReactor::EpollReactor(TCPServer* tcpserver, int buffer_size):_server(tcpserver), _buffer_size(buffer_size)
 
 {
 }
@@ -48,19 +47,21 @@ bool EpollReactor::operator==(const EpollReactor& other)
 
 }
 
-void EpollReactor::run(size_t buffer_size = 1024)
+void EpollReactor::run()
 {
 
     epoll_event ev, events[10000];
 
     int _epf = epoll_create(10000);
 
-    ev.data.fd = _sock;
+    int sock = _server->sock();
+    ev.data.fd = sock;
     ev.events = EPOLLIN;
-    epoll_ctl(_epf, EPOLL_CTL_ADD, _sock, &ev);
+    epoll_ctl(_epf, EPOLL_CTL_ADD, sock, &ev);
 
-    if (buffer_size < 1024 || buffer_size > 1024 * 1024 * 100) buffer_size = 1024;
-    char* buf = new char[buffer_size];
+    if (_buffer_size < 1024 || _buffer_size > 1024 * 1024 * 100) _buffer_size = 1024;
+    char* buffer = new char[_buffer_size];
+    char* buf;
     size_t len = 0;
 
     int r = 0;
@@ -68,19 +69,18 @@ void EpollReactor::run(size_t buffer_size = 1024)
     int peer;
     sockaddr_in addr;
     socklen_t sock_len;
-    TCPSocket sock;
+    TCPSocket peersocket;
 
-    int loop = 1000;
-    while(loop) {
-        --loop;
+    while(1) {
+        buf = buffer;
         int n = epoll_wait(_epf, events, 10000, -1);
         if (n > 0) {
             //t = clock();
             for(int i = 0; i < n; ++i) {
-                if(events[i].data.fd == _sock) {
+                if(events[i].data.fd == sock) {
                     // process accept
 
-                    peer = accept(_sock, (sockaddr*)&addr, &sock_len);
+                    peer = accept(sock, (sockaddr*)&addr, &sock_len);
                     if (peer == -1) {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             perror ("accept by others");
@@ -92,25 +92,25 @@ void EpollReactor::run(size_t buffer_size = 1024)
                         return;
                     }
 
-                    //_handle_handshake(peer, buf, buffer_size);
-                    r = hb->handle_handshake(peer, buf, buffer_size);
+                    r = _server->handle()->handle_handshake(peer, buf, _buffer_size);
                     if (r == -1){ ::close(peer); continue; }
 
-                    sock.sock(peer);
-                    sock.set_noblock();
+                    peersocket.sock(peer);
+                    peersocket.set_noblock();
                     ev.data.fd = peer;
                     ev.events = EPOLLIN;
 
-                    epoll_ctl(_epf, EPOLL_CTL_ADD, sock.sock(), &ev);
+                    epoll_ctl(_epf, EPOLL_CTL_ADD, peer, &ev);
+                    perror ("epoll_ctr has issue? :");
+                    cout << "new socket:" << peer << endl << flush;
                 } else {
-                    // process client input
-
-                    //r = _handle_input(events[i].data.fd, buf, buffer_size);
-                    r = hb->handle_input(events[i].data.fd, buf, buffer_size);
+                    
+                    r = _server->handle()->handle_input(events[i].data.fd, buf, _buffer_size);
 
                     if (r == -1) {
                         epoll_ctl(_epf, EPOLL_CTL_DEL, events[i].data.fd, &ev);
                         ::close(events[i].data.fd);
+                        cout << "close socket:" << peer << endl << flush;
                         continue;
                     }
 

@@ -17,24 +17,22 @@
  *
  */
 
-#ifndef TCPSOCKET_H
-#define TCPSOCKET_H
+#ifndef HTTPFORWARDER_H
+#define HTTPFORWARDER_H
 
-#include "pch.h"
+#include "../handler.h"
 
-class TCPSocket
+class HttpForwarder : public HandlerBase
 {
-public:
-    TCPSocket(int fd = -1);
-    ~TCPSocket();
-    bool server(int port);
-    bool connect(const char*, int port);
-    void set_noblock();
-    void close();
-    int sock()const {return _sock;}
-    void sock(int sock) {_sock = sock; }
-private:
-  int _sock;
+protected:
+    virtual int do_handle_output(int sock, const char* buf, size_t len);
+    virtual int do_handle_input(int sock, char*& buf, size_t len);
+    virtual int do_handle_handshake(int sock, char*& buf, size_t len);
 };
 
-#endif // TCPSOCKET_H
+extern "C" HandlerBase* create_httpforwarder(){
+
+    new HttpForwarder();
+}
+
+#endif // HTTPFORWARDER_H

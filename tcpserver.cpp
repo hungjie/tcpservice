@@ -28,32 +28,31 @@
 
 static void* f(void* imp) {
     EpollReactor* im = (EpollReactor *)imp;
-    INIConfig& c = Singleton<INIConfig>::instance();
-    int buffer_size = c.get_value_i("[sys]", "max_body_size");
-    im->run(buffer_size);
+    im->run();
 }
 
 void TCPServer::run(int thread_num)
 {
+    INIConfig& c = Singleton<INIConfig>::instance();
+    int buffer_size = c.get_value_i("[sys]", "max_body_size");
+    EpollReactor imp(this, buffer_size);
+    
     if (thread_num < 1) {
-        EpollReactor imp(_sock, Handler::handle_handshake, Handler::handle_input, Handler::handle_output);
-        imp.run(2048);
+        imp.run();
         return;
     }
     
-    pthread_t *threads = new pthread_t[thread_num];
+    pthread_t thread;
     
-    EpollReactor imp(_sock, Handler::handle_handshake, Handler::handle_input, Handler::handle_output);
+    
     for (int i = 0; i < thread_num; ++i){
-      pthread_create(&threads[i], 0, f, &imp);
-      //imp.run();
-      cout << "create thread:" << threads[i] << endl;
+      pthread_create(&thread, 0, f, &imp);
+      _threads.push_back(thread);
     }
-    for (int i = 0; i < thread_num; ++i)
-      pthread_join(threads[i], 0);
+    
 }
 
-TCPServer::TCPServer(int port)
+TCPServer::TCPServer(int port, HandlerBase* h):_h(h)
 {
     TCPSocket  server;
     server.server(port);

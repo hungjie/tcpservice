@@ -19,15 +19,25 @@
 
 #ifndef REACTOR_H
 #define REACTOR_H
+
+#include "pch.h"
+#include <vector>
 #include "handler.h"
 
 class TCPServer
 {
 public:
-    TCPServer(int port);
+    TCPServer(int port, HandlerBase* h);
     ~TCPServer();
     void run(int thread_num = 1);
     int sock() {return _sock;}
+    HandlerBase* handle(){return _h;}
+    
+    void wait(){
+        for (vector<pthread_t>::iterator it = _threads.begin(); it != _threads.end(); ++it)
+            pthread_join(*it, 0);
+    }
+    
 private:
     TCPServer(const TCPServer& other);
     TCPServer& operator=(const TCPServer& other);
@@ -35,6 +45,7 @@ private:
 private:
   int _sock;
   HandlerBase *_h;
+  vector<pthread_t> _threads;
   
 };
 

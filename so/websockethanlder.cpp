@@ -35,11 +35,10 @@ struct WebSocket_data_t{
         
     };
     
-    unsigned char len:7;
+    unsigned char len_0:7;
     unsigned char mask: 1;
     
     union{
-        char data[1];
         struct {
             unsigned char mask_dada_0 [4];
             char data_0[1];
@@ -56,39 +55,86 @@ struct WebSocket_data_t{
         };
     };
 };
+
+struct WebSocket_data_nomask_t{
+    union{
+        unsigned char c;
+        struct {
+            unsigned char op:4;
+            unsigned char rsv: 3;
+            unsigned char fin: 1;
+        };
+        
+    };
+    
+    unsigned char len_0:7;
+    unsigned char mask: 1;
+    
+    union{
+
+            
+        char data_0[1];
+
+        struct {
+            unsigned short int len_1;
+            char data_1[1];
+        };
+        struct {
+            long int len_2;
+            char data_2[1];
+        };
+    };
+};
 #pragma pack()
 
 
-int WebSocketHanlder::handle_output(int sock, const char* buf, size_t len)
+int WebSocketHanlder::do_handle_output(int sock, const char* buf, size_t len)
 {
-    return write(sock, buf, len);
+    WebSocket_data_nomask_t data;
+    data.c = 0x81;
+    data.mask = 0;
+    size_t data_size = 2;
+    if (len < 126) {
+        data.len_0 = len; 
+    } else if (len > 126 && len < 0xFFFF){
+        data.len_0 = 126;
+        data.len_1 = htons((short int)len);
+        data_size = 4;
+    } else {
+        return -1; // TODO
+        data.len_0 = 127;
+        data.len_2 = len;
+        data_size = 10;
+    }
+    write(sock, &data, data_size);
+    write(sock, buf, len);
+    return len;
 
 }
 
-int WebSocketHanlder::handle_input(int sock, char* buf, size_t len)
+int WebSocketHanlder::do_handle_input(int sock, char*& buf, size_t len)
 {
     int r = read(sock, buf, len);
     
     buf[r] = 0;
-    
-    cout << "recievd: " << buf + 1 << endl;
-    
+        
     unsigned long data_len;
     unsigned char* mask;
     char* data_p;
 
     if (r > 0) {
         WebSocket_data_t *data = (WebSocket_data_t *) buf;
-        data_len = data->len;
+        data_len = data->len_0;
         mask = data->mask_dada_0;
         data_p =  data->data_0;        
         
-        if (data->len == 126) {
-            data_len = data->len_1;
+        if (data->len_0 == 126) {
+            data_len = ntohs(data->len_1);
             mask =data->mask_dada_1;
             data_p = data->data_1;
             
-        } else if (data->len == 127){
+        } else if (data->len_0 == 127){
+            return -1; // TODO
             data_len = data->len_2;
             mask =data->mask_dada_2;
             data_p = data->data_2;
@@ -102,6 +148,7 @@ int WebSocketHanlder::handle_input(int sock, char* buf, size_t len)
         for (int i = 0; i < data_len; ++i){
             data_p[i] ^= mask[i % 4];
         }
+        buf = data_p;
         return data_len;
         
     }
@@ -114,17 +161,13 @@ int WebSocketHanlder::handle_input(int sock, char* buf, size_t len)
     }
     return -1;
 }
-class Less: public binary_function<char*, char*, int>
-{
-public:
-    int operator()(char* s1, char* s2){ return strcmp(s1, s2); }
-};
 
-int WebSocketHanlder::handle_handshake(int sock, char* buf, size_t len)
+int WebSocketHanlder::do_handle_handshake(int sock, char*& buf, size_t len)
 {
     const char* const WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     const char* const WEBSOCKET_VERSION = "13";
     int l = read(sock, buf, len);
+    
     if (l <1) return -1;
     buf[l] = 0;
 
@@ -182,10 +225,10 @@ int WebSocketHanlder::handle_handshake(int sock, char* buf, size_t len)
              "Upgrade: websocket\r\n"
              "Connection: Upgrade\r\n"
              "Sec-WebSocket-Accept: %s\r\n"
-             "Sec-WebSocket-Protocol: chat\r\n\r\n", key.c_str());
+             "\r\n", key.c_str());
 
 
     write(sock, buf, strlen(buf));
 
-    return 1;
+    return len;
 }

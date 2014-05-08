@@ -19,12 +19,12 @@
 
 #include "httphandler.h"
 
-int HttpHandler::handle_output(int sock, const char* buf, size_t len)
+int HttpHandler::do_handle_output(int sock, const char* buf, size_t len)
 {
   return write(sock, buf, len);
 }
 
-int HttpHandler::handle_input(int sock, char* buf, size_t len)
+int HttpHandler::do_handle_input(int sock, char*& buf, size_t len)
 {
   int r = read(sock, buf, len);
 
@@ -55,13 +55,12 @@ int HttpHandler::handle_input(int sock, char* buf, size_t len)
         if (r == 0) return -1;
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            len = 0;
             return 0;
         }
         return -1;
 }
 
-int HttpHandler::handle_handshake(int sock, char* buf, size_t len)
+int HttpHandler::do_handle_handshake(int sock, char*& buf, size_t len)
 {
   return 1;
 }

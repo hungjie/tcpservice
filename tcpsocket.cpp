@@ -30,11 +30,12 @@ TCPSocket::~TCPSocket()
 
 }
 
-void TCPSocket::server(int port)
+bool TCPSocket::server(int port)
 {
     _sock = socket(AF_INET, SOCK_STREAM, 0);
     if(_sock == -1) {
         perror("socket: ");
+        return false;
     }
 
     struct sockaddr_in server_addr;
@@ -45,10 +46,34 @@ void TCPSocket::server(int port)
 
     if (-1 == bind(_sock, (sockaddr*)(&server_addr), sizeof(server_addr))){
       perror("bind: ");
+      return false;
     }
 
     listen(_sock, 20000);
+    return true;
 
+}
+
+bool TCPSocket::connect(const char* host, int port)
+{
+    _sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(_sock == -1) {
+        perror("socket: ");
+    }
+
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server_addr.sin_port = htons(port);
+
+    int r = ::connect(_sock, (sockaddr*)&server_addr, sizeof(server_addr));
+    if (r == -1)
+    {
+        perror("connect error");
+        return false;
+    }
+    return true;
 }
 
 void TCPSocket::set_noblock()
